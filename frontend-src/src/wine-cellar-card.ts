@@ -38,6 +38,9 @@ export class WineCellarCard extends LitElement {
   @state() private _activeTab = "all";
   @state() private _searchQuery = "";
   @state() private _searchFilter = "all";
+  // Drink now / Hold / Past peak filter: "" (any), "D", "H", "P".
+  @state() private _drinkFilter = "";
+  @state() private _dispositionBadge: "disc" | "corner" | "off" = "disc";
   @state() private _selectedWine: Wine | null = null;
   @state() private _showDetail = false;
   @state() private _detailMode: "cellar" | "buylist" | "winelist" = "cellar";
@@ -649,6 +652,7 @@ export class WineCellarCard extends LitElement {
       this._metadataCurrency = capResult?.metadata_currency || "USD";
       this._supportedCurrencies = capResult?.supported_currencies || ["USD", "EUR", "GBP", "CHF"];
       this._aiFallbackAlways = capResult?.ai_fallback_always || false;
+      this._dispositionBadge = capResult?.disposition_badge || "disc";
       this._dismissedArrangements = capResult?.dismissed_arrangements || [];
       this._buyList = buyListResult?.buy_list || [];
       this._pendingRemovals = pendingRemovalsResult?.pending_removals || {};
@@ -692,6 +696,11 @@ export class WineCellarCard extends LitElement {
     // Filter by wine type
     if (this._searchFilter !== "all") {
       wines = wines.filter((w) => w.type === this._searchFilter);
+    }
+
+    // Filter by drinking status (Drink now / Hold / Past peak)
+    if (this._drinkFilter) {
+      wines = wines.filter((w) => w.disposition === this._drinkFilter);
     }
 
     // Filter by search query — same matcher as the inventory dialog, so a
@@ -1227,6 +1236,7 @@ export class WineCellarCard extends LitElement {
     // bottle's own rack.
     this._searchQuery = "";
     this._searchFilter = "all";
+    this._drinkFilter = "";
     this._activeTab = loc.cabinet.id;
 
     // Mark the bottle on the rack drawing regardless of whether a side panel
@@ -1840,6 +1850,21 @@ export class WineCellarCard extends LitElement {
     }
   }
 
+  private async _setDispositionBadge(value: "disc" | "corner" | "off") {
+    if (value === this._dispositionBadge) return;
+    const previous = this._dispositionBadge;
+    this._dispositionBadge = value;
+    try {
+      await this.hass.callWS({
+        type: "wine_cellar/update_settings",
+        updates: { disposition_badge: value },
+      });
+    } catch (err) {
+      this._dispositionBadge = previous;
+      this._showToast("Failed to change the badge setting");
+    }
+  }
+
   private async _setAiFallbackAlways(value: boolean) {
     if (value === this._aiFallbackAlways) return;
     const previous = this._aiFallbackAlways;
@@ -2093,6 +2118,7 @@ export class WineCellarCard extends LitElement {
   private _onSearch(e: CustomEvent) {
     this._searchQuery = e.detail.query;
     this._searchFilter = e.detail.filter;
+    this._drinkFilter = e.detail.drinkFilter || "";
   }
 
   private _getCabinetWines(cabinetId: string): Wine[] {
@@ -2115,7 +2141,7 @@ export class WineCellarCard extends LitElement {
 
     const title = this._config?.title || "Cork Dork";
     const filteredWines = this._getFilteredWines();
-    const isSearching = !!(this._searchQuery || this._searchFilter !== "all");
+    const isSearching = !!(this._searchQuery || this._searchFilter !== "all" || this._drinkFilter);
     const unassignedWines = this._getUnassignedWines();
     const showGrid = !isSearching && this._activeTab !== "buy-list" && this._activeTab !== "unassigned" && (this._activeTab === "all" || this._cabinets.some((c) => c.id === this._activeTab));
     const showBuyList = this._activeTab === "buy-list" && !isSearching;
@@ -2325,6 +2351,7 @@ export class WineCellarCard extends LitElement {
         <wine-search-bar
           .value=${this._searchQuery}
           .filter=${this._searchFilter}
+          .drinkFilter=${this._drinkFilter}
           @search-change=${this._onSearch}
         ></wine-search-bar>
 
@@ -2397,6 +2424,7 @@ export class WineCellarCard extends LitElement {
                           .wines=${this._getCabinetWines(cab.id)}
                           .highlightWineId=${this._highlightWineId}
                           .removalHighlightIds=${this._removalHighlightIds}
+                          .dispositionBadge=${this._dispositionBadge}
                           @cell-click=${this._onCellClick}
                           @zone-click=${this._onZoneClick}
                           @zone-container-click=${this._onZoneContainerClick}
@@ -2418,6 +2446,7 @@ export class WineCellarCard extends LitElement {
                             .wines=${this._getCabinetWines(cab.id)}
                             .highlightWineId=${this._highlightWineId}
                             .removalHighlightIds=${this._removalHighlightIds}
+                          .dispositionBadge=${this._dispositionBadge}
                             @cell-click=${this._onCellClick}
                             @zone-click=${this._onZoneClick}
                             @zone-container-click=${this._onZoneContainerClick}
@@ -2877,7 +2906,9 @@ export class WineCellarCard extends LitElement {
           .supportedLanguages=${this._supportedLanguages}
           .metadataCurrency=${this._metadataCurrency}
           .supportedCurrencies=${this._supportedCurrencies}
+          .dispositionBadge=${this._dispositionBadge}
           @close=${() => (this._showVivinoAiSettings = false)}
+          @set-disposition-badge=${(e: CustomEvent) => this._setDispositionBadge(e.detail.value)}
           @set-ai-fallback-always=${(e: CustomEvent) => this._setAiFallbackAlways(e.detail.value)}
           @set-metadata-language=${(e: CustomEvent) => this._setMetadataLanguage(e.detail.value)}
           @set-metadata-currency=${(e: CustomEvent) => this._setMetadataCurrency(e.detail.value)}

@@ -37,6 +37,7 @@ A custom Home Assistant integration for managing your wine collection. Track bot
   show_header: true       # optional, bottle count line
   ```
 - **Vivino Profile** — For bottles linked to Vivino, Cork Dork fetches what the Vivino app shows on the wine's page: the **recommended drinking window** for that vintage (also sets Drink now / Hold / Past peak), the **taste profile** (light↔bold, smooth↔tannic, dry↔sweet, soft↔acidic, gentle↔fizzy), the **main flavours**, the **wine style**, and any **awards and critic scores**, in your metadata language. Vivino's window replaces an AI estimate but never one you set by hand. Fetched on refresh, when a bottle is added, and in the background after a Vivino account sync.
+- **Drinking Status** — Bottles marked Drink now / Hold / Past peak show it on the rack. In **Vivino / AI Settings** choose how: a disc over the label (default), a small corner dot that keeps the label visible, or hidden. The search bar can also filter the list by status.
 - **Per-Row Type Selector** — Each rack row can be independently set to Slots (grid), Bulk Bin, or Wine Box via the rack settings dialog.
 - **Staggered (Honeycomb) Racks** — Each slot row can hold fewer bottles than the rack is wide; shorter rows are drawn offset by half a slot, like a diamond/honeycomb rack where bottles rest in the gaps of the row below. One click on **Staggered rows** alternates full and one-short rows (e.g. 3/2/3/2), or set each row's count with its own stepper.
 

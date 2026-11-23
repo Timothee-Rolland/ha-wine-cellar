@@ -47,6 +47,7 @@ export class WineCellarSectionCard extends LitElement {
   @state() private _hasGemini = false;
   @state() private _aiFallbackAlways = false;
   @state() private _currency = "USD";
+  @state() private _dispositionBadge: "disc" | "corner" | "off" = "disc";
 
   @state() private _selectedWine: Wine | null = null;
   @state() private _showDetail = false;
@@ -228,6 +229,7 @@ export class WineCellarSectionCard extends LitElement {
       this._hasGemini = !!caps?.has_gemini;
       this._aiFallbackAlways = !!caps?.ai_fallback_always;
       this._currency = caps?.metadata_currency || "USD";
+      this._dispositionBadge = caps?.disposition_badge || "disc";
       this._error = "";
       this._loaded = true;
       if (this._selectedWine) {
@@ -393,6 +395,7 @@ export class WineCellarSectionCard extends LitElement {
           : nothing}
         <div class="grid-wrap">
           <cabinet-grid
+            .dispositionBadge=${this._dispositionBadge}
             .cabinet=${cab}
             .wines=${wines}
             @cell-click=${this._onCellClick}

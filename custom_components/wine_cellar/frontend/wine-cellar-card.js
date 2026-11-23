@@ -1796,6 +1796,7 @@ ArrangementDialog = __decorate([
     t("arrangement-dialog")
 ], ArrangementDialog);
 
+const DISPOSITION_TITLES = { D: "Drink now", H: "Hold", P: "Past peak" };
 let CabinetGrid = class CabinetGrid extends i {
     constructor() {
         super(...arguments);
@@ -1806,6 +1807,9 @@ let CabinetGrid = class CabinetGrid extends i {
         // Candidates for a pending Vivino removal: every listed bottle gets an
         // orange ring so the user can see which ones may be the removed bottle.
         this.removalHighlightIds = [];
+        // Drink now / Hold / Past peak status: "disc" over the label, "corner"
+        // dot, or "off" (app setting disposition_badge).
+        this.dispositionBadge = "disc";
         this._dragOverCell = null;
         // --- Long press (mobile move) ---
         this._longPressTimer = null;
@@ -2041,7 +2045,7 @@ let CabinetGrid = class CabinetGrid extends i {
               title="${wine.name} (${wine.vintage || "NV"})"
             >
               ${(wine.vintage || "NV").toString().slice(-2)}
-              ${dispClass ? b `<span class="disposition ${dispClass}">${disp}</span>` : A}
+              ${dispClass && this.dispositionBadge !== "off" ? b `<span class="disposition ${dispClass} ${this.dispositionBadge === "corner" ? "corner" : ""}" title=${DISPOSITION_TITLES[disp] || ""}>${this.dispositionBadge === "corner" ? "" : disp}</span>` : A}
             </div>
           `;
         })}
@@ -2136,7 +2140,7 @@ let CabinetGrid = class CabinetGrid extends i {
                 ? b `
                     ${frontWine.image_url ? b `<img class="wine-thumb" src="${frontWine.image_url}" alt="" />` : A}
                     <span class="bottle-label">${frontWine.vintage || "NV"}</span>
-                    ${dispClass ? b `<span class="disposition ${dispClass}">${disp}</span>` : A}
+                    ${dispClass && this.dispositionBadge !== "off" ? b `<span class="disposition ${dispClass} ${this.dispositionBadge === "corner" ? "corner" : ""}" title=${DISPOSITION_TITLES[disp] || ""}>${this.dispositionBadge === "corner" ? "" : disp}</span>` : A}
                     ${ratingDisplay ? b `<span class="rating-badge">★${ratingDisplay}</span>` : A}
                     ${wineCount > 1 ? b `<span class="depth-badge">${wineCount}</span>` : A}
                     ${cabinetDepth >= 2
@@ -2207,7 +2211,7 @@ let CabinetGrid = class CabinetGrid extends i {
             ? b `
               ${frontWine.image_url ? b `<img class="wine-thumb" src="${frontWine.image_url}" alt="" />` : A}
               <span class="bottle-label">${frontWine.vintage || "NV"}</span>
-              ${dispClass ? b `<span class="disposition ${dispClass}">${disp}</span>` : A}
+              ${dispClass && this.dispositionBadge !== "off" ? b `<span class="disposition ${dispClass} ${this.dispositionBadge === "corner" ? "corner" : ""}" title=${DISPOSITION_TITLES[disp] || ""}>${this.dispositionBadge === "corner" ? "" : disp}</span>` : A}
               ${ratingDisplay ? b `<span class="rating-badge">★${ratingDisplay}</span>` : A}
               ${wineCount > 1 ? b `<span class="depth-badge">${wineCount}</span>` : A}
               ${cabinetDepth >= 2
@@ -2510,6 +2514,23 @@ CabinetGrid.styles = [
         line-height: 1;
         border: 2px solid rgba(255, 255, 255, 0.5);
         box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+      }
+
+      /* Small status dot in the top-right corner: the label stays visible. */
+      .cell .disposition.corner,
+      .zone-bottle .disposition.corner {
+        /* Inside the round cell's edge, so it is not clipped. */
+        top: 12%;
+        right: 12%;
+        left: auto;
+        transform: none;
+        width: 28%;
+        height: 28%;
+        min-width: 7px;
+        min-height: 7px;
+        max-width: 12px;
+        max-height: 12px;
+        border-width: 1.5px;
       }
 
       .cell .disposition.drink,
@@ -2856,6 +2877,9 @@ __decorate([
 __decorate([
     n({ attribute: false })
 ], CabinetGrid.prototype, "removalHighlightIds", void 0);
+__decorate([
+    n({ type: String })
+], CabinetGrid.prototype, "dispositionBadge", void 0);
 __decorate([
     r()
 ], CabinetGrid.prototype, "_dragOverCell", void 0);
@@ -6990,11 +7014,13 @@ let WineSearchBar = class WineSearchBar extends i {
         super(...arguments);
         this.value = "";
         this.filter = "all";
+        // Drink now / Hold / Past peak: "" (any), "D", "H" or "P".
+        this.drinkFilter = "";
     }
     _onInput(e) {
         const value = e.target.value;
         this.dispatchEvent(new CustomEvent("search-change", {
-            detail: { query: value, filter: this.filter },
+            detail: { query: value, filter: this.filter, drinkFilter: this.drinkFilter },
             bubbles: true,
             composed: true,
         }));
@@ -7003,7 +7029,7 @@ let WineSearchBar = class WineSearchBar extends i {
     // enough to see. One tap, and the caret stays where the user can keep typing.
     _clear() {
         this.dispatchEvent(new CustomEvent("search-change", {
-            detail: { query: "", filter: this.filter },
+            detail: { query: "", filter: this.filter, drinkFilter: this.drinkFilter },
             bubbles: true,
             composed: true,
         }));
@@ -7017,7 +7043,17 @@ let WineSearchBar = class WineSearchBar extends i {
         this.filter = filter;
         const input = this.shadowRoot?.querySelector("input");
         this.dispatchEvent(new CustomEvent("search-change", {
-            detail: { query: input?.value || "", filter },
+            detail: { query: input?.value || "", filter, drinkFilter: this.drinkFilter },
+            bubbles: true,
+            composed: true,
+        }));
+    }
+    // A second, independent filter: tap again to clear.
+    _onDrinkFilterChange(code) {
+        this.drinkFilter = this.drinkFilter === code ? "" : code;
+        const input = this.shadowRoot?.querySelector("input");
+        this.dispatchEvent(new CustomEvent("search-change", {
+            detail: { query: input?.value || "", filter: this.filter, drinkFilter: this.drinkFilter },
             bubbles: true,
             composed: true,
         }));
@@ -7061,6 +7097,20 @@ let WineSearchBar = class WineSearchBar extends i {
                 @click=${() => this._onFilterChange(f.id)}
               >
                 ${f.label}
+              </button>
+            `)}
+        </div>
+        <div class="filter-chips">
+          ${[
+            { id: "D", label: "Drink now", cls: "drink" },
+            { id: "H", label: "Hold", cls: "hold" },
+            { id: "P", label: "Past peak", cls: "past" },
+        ].map((f) => b `
+              <button
+                class="chip drink-chip ${f.cls} ${this.drinkFilter === f.id ? "active" : ""}"
+                @click=${() => this._onDrinkFilterChange(f.id)}
+              >
+                <span class="dot"></span>${f.label}
               </button>
             `)}
         </div>
@@ -7164,6 +7214,21 @@ WineSearchBar.styles = [
         color: var(--wc-text);
       }
 
+      .drink-chip .dot {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        margin-right: 5px;
+        vertical-align: middle;
+      }
+      .drink-chip.drink .dot { background: #2e7d32; }
+      .drink-chip.hold .dot { background: #1565c0; }
+      .drink-chip.past .dot { background: #c62828; }
+      .filter-chips + .filter-chips {
+        margin-top: 6px;
+      }
+
       .filter-chips {
         display: flex;
         flex-wrap: wrap;
@@ -7199,6 +7264,9 @@ __decorate([
 __decorate([
     n({ type: String })
 ], WineSearchBar.prototype, "filter", void 0);
+__decorate([
+    n({ type: String })
+], WineSearchBar.prototype, "drinkFilter", void 0);
 WineSearchBar = __decorate([
     t("wine-search-bar")
 ], WineSearchBar);
@@ -11790,6 +11858,7 @@ let VivinoAiSettingsDialog = class VivinoAiSettingsDialog extends i {
         this.supportedLanguages = ["en", "fr", "de"];
         this.metadataCurrency = "USD";
         this.supportedCurrencies = ["USD", "EUR", "GBP", "CHF"];
+        this.dispositionBadge = "disc";
     }
     _close() {
         this.dispatchEvent(new CustomEvent("close"));
@@ -11845,6 +11914,22 @@ let VivinoAiSettingsDialog = class VivinoAiSettingsDialog extends i {
                   class="pill ${this.metadataCurrency === cur ? "active" : ""}"
                   @click=${() => this._setCurrency(cur)}
                 >${cur}</button>
+              `)}
+            </div>
+          </div>
+
+          <div class="settings-row">
+            <span class="settings-label">Drink now / Hold / Past badge</span>
+            <div class="pill-group">
+              ${[
+            ["disc", "Over label"],
+            ["corner", "Corner dot"],
+            ["off", "Hidden"],
+        ].map(([value, label]) => b `
+                <button
+                  class="pill ${this.dispositionBadge === value ? "active" : ""}"
+                  @click=${() => this.dispatchEvent(new CustomEvent("set-disposition-badge", { detail: { value } }))}
+                >${label}</button>
               `)}
             </div>
           </div>
@@ -11991,6 +12076,9 @@ __decorate([
 __decorate([
     n({ attribute: false })
 ], VivinoAiSettingsDialog.prototype, "supportedCurrencies", void 0);
+__decorate([
+    n({ type: String })
+], VivinoAiSettingsDialog.prototype, "dispositionBadge", void 0);
 VivinoAiSettingsDialog = __decorate([
     t("vivino-ai-settings-dialog")
 ], VivinoAiSettingsDialog);
@@ -12013,6 +12101,7 @@ let WineCellarSectionCard = class WineCellarSectionCard extends i {
         this._hasGemini = false;
         this._aiFallbackAlways = false;
         this._currency = "USD";
+        this._dispositionBadge = "disc";
         this._selectedWine = null;
         this._showDetail = false;
         this._picker = null;
@@ -12079,6 +12168,7 @@ let WineCellarSectionCard = class WineCellarSectionCard extends i {
             this._hasGemini = !!caps?.has_gemini;
             this._aiFallbackAlways = !!caps?.ai_fallback_always;
             this._currency = caps?.metadata_currency || "USD";
+            this._dispositionBadge = caps?.disposition_badge || "disc";
             this._error = "";
             this._loaded = true;
             if (this._selectedWine) {
@@ -12234,6 +12324,7 @@ let WineCellarSectionCard = class WineCellarSectionCard extends i {
             : A}
         <div class="grid-wrap">
           <cabinet-grid
+            .dispositionBadge=${this._dispositionBadge}
             .cabinet=${cab}
             .wines=${wines}
             @cell-click=${this._onCellClick}
@@ -12434,6 +12525,9 @@ __decorate([
 ], WineCellarSectionCard.prototype, "_currency", void 0);
 __decorate([
     r()
+], WineCellarSectionCard.prototype, "_dispositionBadge", void 0);
+__decorate([
+    r()
 ], WineCellarSectionCard.prototype, "_selectedWine", void 0);
 __decorate([
     r()
@@ -12544,6 +12638,9 @@ let WineCellarCard = class WineCellarCard extends i {
         this._activeTab = "all";
         this._searchQuery = "";
         this._searchFilter = "all";
+        // Drink now / Hold / Past peak filter: "" (any), "D", "H", "P".
+        this._drinkFilter = "";
+        this._dispositionBadge = "disc";
         this._selectedWine = null;
         this._showDetail = false;
         this._detailMode = "cellar";
@@ -12742,6 +12839,7 @@ let WineCellarCard = class WineCellarCard extends i {
             this._metadataCurrency = capResult?.metadata_currency || "USD";
             this._supportedCurrencies = capResult?.supported_currencies || ["USD", "EUR", "GBP", "CHF"];
             this._aiFallbackAlways = capResult?.ai_fallback_always || false;
+            this._dispositionBadge = capResult?.disposition_badge || "disc";
             this._dismissedArrangements = capResult?.dismissed_arrangements || [];
             this._buyList = buyListResult?.buy_list || [];
             this._pendingRemovals = pendingRemovalsResult?.pending_removals || {};
@@ -12780,6 +12878,10 @@ let WineCellarCard = class WineCellarCard extends i {
         // Filter by wine type
         if (this._searchFilter !== "all") {
             wines = wines.filter((w) => w.type === this._searchFilter);
+        }
+        // Filter by drinking status (Drink now / Hold / Past peak)
+        if (this._drinkFilter) {
+            wines = wines.filter((w) => w.disposition === this._drinkFilter);
         }
         // Filter by search query — same matcher as the inventory dialog, so a
         // query never gives different results depending on which screen it was
@@ -13272,6 +13374,7 @@ let WineCellarCard = class WineCellarCard extends i {
         // bottle's own rack.
         this._searchQuery = "";
         this._searchFilter = "all";
+        this._drinkFilter = "";
         this._activeTab = loc.cabinet.id;
         // Mark the bottle on the rack drawing regardless of whether a side panel
         // opens — for a plain bottom-zone bottle the drawing is the only place it
@@ -13871,6 +13974,22 @@ let WineCellarCard = class WineCellarCard extends i {
             this._showToast("Failed to change currency");
         }
     }
+    async _setDispositionBadge(value) {
+        if (value === this._dispositionBadge)
+            return;
+        const previous = this._dispositionBadge;
+        this._dispositionBadge = value;
+        try {
+            await this.hass.callWS({
+                type: "wine_cellar/update_settings",
+                updates: { disposition_badge: value },
+            });
+        }
+        catch (err) {
+            this._dispositionBadge = previous;
+            this._showToast("Failed to change the badge setting");
+        }
+    }
     async _setAiFallbackAlways(value) {
         if (value === this._aiFallbackAlways)
             return;
@@ -14125,6 +14244,7 @@ let WineCellarCard = class WineCellarCard extends i {
     _onSearch(e) {
         this._searchQuery = e.detail.query;
         this._searchFilter = e.detail.filter;
+        this._drinkFilter = e.detail.drinkFilter || "";
     }
     _getCabinetWines(cabinetId) {
         return this._wines.filter((w) => w.cabinet_id === cabinetId);
@@ -14143,7 +14263,7 @@ let WineCellarCard = class WineCellarCard extends i {
         }
         const title = this._config?.title || "Cork Dork";
         const filteredWines = this._getFilteredWines();
-        const isSearching = !!(this._searchQuery || this._searchFilter !== "all");
+        const isSearching = !!(this._searchQuery || this._searchFilter !== "all" || this._drinkFilter);
         const unassignedWines = this._getUnassignedWines();
         const showGrid = !isSearching && this._activeTab !== "buy-list" && this._activeTab !== "unassigned" && (this._activeTab === "all" || this._cabinets.some((c) => c.id === this._activeTab));
         const showBuyList = this._activeTab === "buy-list" && !isSearching;
@@ -14350,6 +14470,7 @@ let WineCellarCard = class WineCellarCard extends i {
         <wine-search-bar
           .value=${this._searchQuery}
           .filter=${this._searchFilter}
+          .drinkFilter=${this._drinkFilter}
           @search-change=${this._onSearch}
         ></wine-search-bar>
 
@@ -14423,6 +14544,7 @@ let WineCellarCard = class WineCellarCard extends i {
                           .wines=${this._getCabinetWines(cab.id)}
                           .highlightWineId=${this._highlightWineId}
                           .removalHighlightIds=${this._removalHighlightIds}
+                          .dispositionBadge=${this._dispositionBadge}
                           @cell-click=${this._onCellClick}
                           @zone-click=${this._onZoneClick}
                           @zone-container-click=${this._onZoneContainerClick}
@@ -14442,6 +14564,7 @@ let WineCellarCard = class WineCellarCard extends i {
                             .wines=${this._getCabinetWines(cab.id)}
                             .highlightWineId=${this._highlightWineId}
                             .removalHighlightIds=${this._removalHighlightIds}
+                          .dispositionBadge=${this._dispositionBadge}
                             @cell-click=${this._onCellClick}
                             @zone-click=${this._onZoneClick}
                             @zone-container-click=${this._onZoneContainerClick}
@@ -14889,7 +15012,9 @@ let WineCellarCard = class WineCellarCard extends i {
           .supportedLanguages=${this._supportedLanguages}
           .metadataCurrency=${this._metadataCurrency}
           .supportedCurrencies=${this._supportedCurrencies}
+          .dispositionBadge=${this._dispositionBadge}
           @close=${() => (this._showVivinoAiSettings = false)}
+          @set-disposition-badge=${(e) => this._setDispositionBadge(e.detail.value)}
           @set-ai-fallback-always=${(e) => this._setAiFallbackAlways(e.detail.value)}
           @set-metadata-language=${(e) => this._setMetadataLanguage(e.detail.value)}
           @set-metadata-currency=${(e) => this._setMetadataCurrency(e.detail.value)}
@@ -15668,6 +15793,12 @@ __decorate([
 __decorate([
     r()
 ], WineCellarCard.prototype, "_searchFilter", void 0);
+__decorate([
+    r()
+], WineCellarCard.prototype, "_drinkFilter", void 0);
+__decorate([
+    r()
+], WineCellarCard.prototype, "_dispositionBadge", void 0);
 __decorate([
     r()
 ], WineCellarCard.prototype, "_selectedWine", void 0);
